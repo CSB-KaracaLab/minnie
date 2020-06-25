@@ -19,12 +19,13 @@ Command-line subcommand executors for minnie top-level script.
 """
 
 import logging
+import os
+import sys
 
 from .parallel import (
     create_mp_pool,
     parallelize
 )
-
 
 # Setup logger
 # _private name to prevent collision/confusion with parent logger
@@ -53,7 +54,7 @@ def splitpdbs(args):
             'Number of trajectories does not match number of ids: ' + \
             f'{len(args.pdbs)} != {len(args.project_ids)}'
     else:
-        logging.info(f'Auto-assigning project ids from input file names')
+        logging.info(f'{"Auto-assigning project ids from input file names"}')
         args.project_ids = [
             f.stem for f in args.pdbs
         ]
@@ -82,7 +83,6 @@ def findbonds(args):
         'hydrophobic',
         'ring_stacking'
     ]
-
     if args.pdbfile:  # single structure
         pdblist = [args.pdbfile.resolve(strict=True)]
     elif args.folder:
@@ -101,9 +101,11 @@ def findbonds(args):
 
     if 'all' in args.itypes:
         args.types = _itypes
+    else:
+        args.types = args.itypes
 
     mp_pool = create_mp_pool(args.nproc)
-    for itype in args.itypes:
+    for itype in args.types:
         parallelize(
             mp_pool,
             comb_int,
@@ -112,10 +114,100 @@ def findbonds(args):
             itypes=itype,
             include_intra=args.intra
         )
-
-    combine_interfacea_results(
-        args.project_id,
-        args.clean
-    )
+    if len(pdblist) != 1:
+        combine_interfacea_results(
+            args.project_id,
+            args.clean
+        )
 
     mp_pool.close()
+
+
+def timefilter(self):
+    """Apply critical interaction filter"""
+    from .filtering import (
+        time_freq_filter
+    )
+
+    if not self.project_id:
+        logging.info(f'{"Auto-assigning project id from input file names"}')
+        self.project_id = (self.pdbfile or self.folder).stem
+
+    path_back = os.getcwd()
+
+    if not self.files:
+        print(f'\n{"where is the file(s) ??"}\n')
+    elif not self.per:
+        print(f'\n{"Please specify a cutoff value to filter out bonds !!"}\n')
+
+    if self.per:
+        for filex in self.files:
+            os.chdir(path_back)
+            time_freq_filter(filex, self.project_id, self.per)
+    else:
+        print("Please give a cutoff value")
+
+
+def comparecx(self):
+    """Calculate common and distinct interactions in two cases"""
+    from .filtering import (
+        compare_bonds
+    )
+
+    compare_bonds(self.project_ids, self.per)
+
+
+def graph(self):
+    """aaaaand graphs!"""
+    from .graphs import (
+        filter_todnaall,
+        filter_todraw,
+        draw_fig
+    )
+    if self.between is not None and self.chainIDs is not None:
+        print("\nPlease specify either chainIDs or betweenness.")
+        sys.exit(1)
+    elif self.between is None and self.chainIDs is None:
+        print("\nPlease specify either chainIDs or betweenness.")
+        sys.exit(1)
+    elif self.itypes == "all":
+        print(self.between)
+        for itypesx in ["hbonds", "ionic", "hydrophobic", "ring_stacking"]:
+            if self.between:
+                print(itypesx)
+                df_collec = filter_todnaall(self.project_ids,
+                                            self.between, self.spp,
+                                            self.per, str(itypesx))
+                draw_fig(df_collec, str(itypesx), self.project_ids[0],
+                         self.project_ids[1],
+                         self.colors[0], self.colors[1], self.filename,
+                         self.spp)
+            elif self.chainIDs:
+                df_collec = filter_todraw(self.project_ids, self.chainIDs,
+                                          self.spp, self.per,
+                                          str(itypesx))
+                draw_fig(df_collec, str(itypesx), self.project_ids[0],
+                         self.project_ids[1],
+                         self.colors[0], self.colors[1], self.filename,
+                         self.spp)
+    elif self.between == "protein-dna":
+        df_collec = filter_todnaall(self.project_ids, self.between,
+                                    self.spp, self.per, self.itypes)
+        draw_fig(df_collec, self.itypes, self.project_ids[0],
+                 self.project_ids[1],
+                 self.colors[0], self.colors[1], self.filename,
+                 self.spp)
+    elif self.between == "all":
+        df_collec = filter_todnaall(self.project_ids, self.between,
+                                    self.spp, self.per, self.itypes)
+        draw_fig(df_collec, self.itypes, self.project_ids[0],
+                 self.project_ids[1],
+                 self.colors[0], self.colors[1], self.filename,
+                 self.spp)
+    else:
+        df_collec = filter_todraw(self.project_ids, self.chainIDs,
+                                  self.spp, self.per, self.itypes)
+        draw_fig(df_collec, self.itypes, self.project_ids[0],
+                 self.project_ids[1],
+                 self.colors[0], self.colors[1], self.filename,
+                 self.spp)
