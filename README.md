@@ -52,7 +52,8 @@ source ~/.bashrc
 
 **1) Your trajectory should be saved in an ensemble format while different conformers are separated by ENDMDL. Then `splitpdbs` option of minnie is used to split your trajectories into single frames.**\
 \
- :exclamation:  Please be sure that your trajectory also includes chainIDs. This is essential to dissect complex-specific interactions at the next steps.   :exclamation:   \
+ :exclamation:  Please be sure that your trajectory also includes chainIDs. This is essential to dissect complex-specific interactions at the next steps. \
+ :exclamation: If your input structures do not come from MD simulation, make sure that they don’t have any missing heavy atoms/hydrogens. \
 \
 The resulting frames are saved under projectID1/01_frames & projectID2/01_frames.
 ```
