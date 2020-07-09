@@ -26,7 +26,7 @@ wget https://github.com/CSB-KaracaLab/minnie/archive/master.zip
 ```
 
 ## Set up the right environment for minnie
-minnie functions under the umbrella of anaconda3 (with Python 3.6). So, before everything, anaconda3 should be installed.
+minnie functions under the umbrella of anaconda3 (with Python 3.6). So, before everything, anaconda3 should be installed. Also, our last setup commands assume that you work in a bash terminal.
 ```
 cd minnie
 conda env create -f environment.yml
@@ -43,7 +43,7 @@ setup.sh finally calls execute.sh script, which sets proper aliases and updates 
 
 ## Activate minnie
 
-When the environment is set, preferentially start a new terminal, alternatively:
+When the environment is set, preferentially start a new bash terminal, alternatively:
 ```
 source ~/.bashrc
 ```
