@@ -41,7 +41,7 @@ def split_pdbs(pdbfile, project_id):
     logging.info(f'Splitting {project_id} ...')
 
     curdir = pathlib.Path('.').resolve(strict=True)
-    output_dir = curdir / project_id / '02_frames'
+    output_dir = curdir / project_id / '01_frames'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     with open(pdbfile, 'r') as pdblines:
@@ -61,22 +61,6 @@ def split_pdbs(pdbfile, project_id):
     logging.info(f'Read {model_no} models from input file.')
 
 
-def paste(x='donor_resnm', y='donor_resid', a=None, b=None, sep=""):
-    """
-
-    :param x: donor_resnm
-    :param y: donor_resid
-    :param a: acceptor_resnm
-    :param b: acceptor_resid
-    :return: pasted variables as string
-    Ex: paste("a","b") // out: 'ab'
-    """
-    if a is not None:
-        return str(x) + str(y) + str(sep) + str(a) + str(b)
-    else:
-        return str(x) + str(sep) + str(y)
-
-
 def comb_int(pdbfile, project_id, itype, include_intra=False, **kwargs):
     """Analyzes the interactions in one or more PDB files.
 
@@ -86,7 +70,8 @@ def comb_int(pdbfile, project_id, itype, include_intra=False, **kwargs):
     """
 
     curdir = pathlib.Path('.').resolve(strict=True)
-    output_dir = curdir / project_id / '03_interfacea_results' / f'{itype}'
+    output_dir = curdir / str(
+        project_id[0]) / '02_interfacea_results' / f'{itype}'
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Setup interfacea
@@ -191,15 +176,15 @@ def comb_int(pdbfile, project_id, itype, include_intra=False, **kwargs):
             "O2P", "O1P", "N", "O", "OC1", "OC2",
             "O4'", "O5'", "O3'", "H", "HA"
         }
-        x = []  # what is x?!
+        specificity = []
         for i in df_table.index:
-            x_acc = df_table["acceptor_atom"][i] in non_spp_atoms
-            x_donor = df_table["acceptor_atom"][i] in non_spp_atoms
-            if (x_acc or x_donor):
-                x.append("non-specific")
+            specificity_acc = df_table["acceptor_atom"][i] in non_spp_atoms
+            specificity_donor = df_table["acceptor_atom"][i] in non_spp_atoms
+            if specificity_acc or specificity_donor:
+                specificity.append("non-specific")
             else:
-                x.append("specific")
-        df_table['specificity'] = x
+                specificity.append("specific")
+        df_table['specificity'] = specificity
 
     frame_no = pdbfile.stem.split('md_')[1]
     df_table["time"] = [frame_no] * len(df_table)
@@ -212,9 +197,8 @@ def comb_int(pdbfile, project_id, itype, include_intra=False, **kwargs):
 
 
 def combine_interfacea_results(project_id, clean=False):
-
     curdir = pathlib.Path('.').resolve(strict=True)
-    output_dir = curdir / project_id / '03_interfacea_results'
+    output_dir = curdir / str(project_id[0]) / '02_interfacea_results'
     output_dir = output_dir.resolve(strict=True)
 
     for child in output_dir.iterdir():
@@ -228,7 +212,7 @@ def combine_interfacea_results(project_id, clean=False):
 
             logging.info(f'writing combined analysis to {child}')
             dfx.to_csv(
-                str(child / f'{project_id}_merged_{child.stem}.csv'),
+                str(child / f'{project_id[0]}_merged_{child.stem}.csv'),
                 index=False
             )
 
