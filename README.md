@@ -43,7 +43,7 @@ setup.sh finally calls execute.sh script, which sets proper aliases and updates 
 
 ## Activate minnie
 
-When the environment is set
+When the environment is set, preferentially start a new terminal, alternatively:
 ```
 source ~/.bashrc
 ```
