@@ -196,23 +196,35 @@ def compare_bonds(project_id, per):
         spp_first_perres = pd.DataFrame(columns=first_df.columns)
         it_over = [["complex_specific", spp_first_l], ["common", common_first]]
         for llist in it_over:
-            spp_first_l = llist[1]
-            for item in spp_first_l.donor_acceptor.unique():
-                f = first_df[first_df.donor_acceptor == item]
-                spp_first_perres = spp_first_perres.append(f)
-
-            spp_first_perres.sort_values(by="time", ascending=False)
-            spp_first_perres.reset_index(drop=True, inplace=True)
-
             pathl_spp = get_paths(patho, str(per), fold, llist[0])
             if llist[0] == "complex_specific":
                 spp = "spec"
             else:
                 spp = "common"
             logging.info("{} list to {}".format(llist[0], name))
+
+            spp_first_l = llist[1]
+            #To check whether there is specified bond lists
+            if not spp_first_l.empty:
+                for item in spp_first_l.donor_acceptor.unique():
+                    f = first_df[first_df.donor_acceptor == item]
+                    spp_first_perres = spp_first_perres.append(f)
+
+                spp_first_perres.sort_values(by="time", ascending=False)
+                spp_first_perres.reset_index(drop=True, inplace=True)
+
+            else:
+                spp_first_perres = pd.DataFrame(
+                    columns=['itype', 'donor_chain', 'acceptor_chain',
+                             'donor_resnm', 'acceptor_resnm', 'donor_resid',
+                             'acceptor_resid', 'donor_atom', 'acceptor_atom',
+                             'donor', 'donorC', 'acceptor', 'acceptorC',
+                            'donor_acceptor', 'chain_type', 'prot_or_dna',
+                             'time'])
             spp_first_perres.to_csv(pathl_spp + "/" + name + "_" +
                                     f'{bondtype}_compared_{spp}_perres.csv',
                                     index=False)
+            del spp_first_l
 
     pathx = os.getcwd()
     fname = project_id[0]
@@ -241,11 +253,11 @@ def compare_bonds(project_id, per):
             pass
         if bondtype == "ring":
             bondtype = "ring_stacking"
-        first = pd.read_csv(filex)
+        df = pd.read_csv(filex)
         if bondtype in tocompare.keys():
-            tocompare[bondtype].update({name: first})
+            tocompare[bondtype].update({name: df})
         else:
-            tocompare.update({bondtype: {name: first}})
+            tocompare.update({bondtype: {name: df}})
 
     for bondtype in tocompare.keys():
         os.chdir(pathx)
@@ -286,5 +298,6 @@ def compare_bonds(project_id, per):
 
         # write  bond list specific to first one
         list_specific_bonds(fname, first, spp_first, common_first, pathy)
+
         # write  bond list specific to second one
         list_specific_bonds(sname, sec, spp_sec, common_sec, pathz)

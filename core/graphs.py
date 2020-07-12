@@ -20,7 +20,6 @@ import datetime
 import itertools
 import logging
 import os
-import sys
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -30,12 +29,18 @@ from matplotlib.legend_handler import HandlerPatch
 
 pd.options.mode.chained_assignment = None
 
-# Setup logger
-# _private name to prevent collision/confusion with parent logger
-# logging.getLogger(__name__).addHandler(logging.NullHandler())
-
 now = datetime.datetime.now()
 timestamp = now.strftime("%H.%M.%S")
+
+
+def define_specifity(spp):
+    if spp == "specific":
+        spec = "spec"
+        cx_spp = "complex_specific"
+    elif spp == "common":
+        spec = "common"
+        cx_spp = "common"
+    return spec, cx_spp
 
 
 def read_file(itypes, per, *args):
@@ -55,16 +60,6 @@ def read_file(itypes, per, *args):
                      'specificity', 'time']
         )
     return ffile
-
-
-def define_specifity(spp):
-    if spp == "specific":
-        spec = "spec"
-        cx_spp = "complex_specific"
-    elif spp == "common":
-        spec = "common"
-        cx_spp = "common"
-    return spec, cx_spp
 
 
 def reformat_subset(subset, itypes, *args):
@@ -157,100 +152,103 @@ def filter_todraw(project_ids, chainIDs, spp, per, itypes):
 
 def draw_fig(df_hbond_collec, itypes, fName, sName,
              fcolor, scolor, *args):
-    if df_hbond_collec.empty:
+    if not df_hbond_collec.empty:
+        pathy = f'{pathx}/graphs'
+
+        os.makedirs(pathy, exist_ok=True)
+
+        colors = [fcolor, scolor]
+        import matplotlib.patches as patches
+        if itypes == "hbonds":
+            itypes = "Hydrogen"
+        else:
+            itypes = itypes.capitalize()
+
+        fig = plt.figure(constrained_layout=True)
+        gs = fig.add_gridspec(4, 4)
+
+        rect = patches.Rectangle((0, 0), 0, 0, linewidth=1,
+                                 edgecolor='black', facecolor='none')
+        ax = fig.add_subplot(gs[:, :])
+        ax.add_patch(rect)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_ylabel("Number of " + itypes + " Bonds", size=18)
+        ax.yaxis.set_label_coords(-0.11, 0.5)
+
+        ax_box1 = fig.add_subplot(gs[:, 0:2])
+
+        boxprops = \
+            dict(linestyle='-', linewidth=1.5, edgecolor='#7f7f7f')
+        medianprops = \
+            {"linestyle": '-', "linewidth": "1.5", "color": "#333333"}
+        capprops = \
+            dict(linestyle='-', linewidth=1.5, color='#7f7f7f')
+        whiskerprops = \
+            dict(linestyle='-', linewidth=1.5, color='#7f7f7f')
+
+        order = [fName, sName]
+        ax_box1.set_ylim(min(df_hbond_collec["uniq"]) - 1,
+                         max(df_hbond_collec["uniq"]) + 1)
+
+        sns.boxplot(data=df_hbond_collec, x="group", y="uniq",
+                    ax=ax_box1, palette=colors, order=order,
+                    medianprops=medianprops, boxprops=boxprops,
+                    capprops=capprops, whiskerprops=whiskerprops)
+        ax_box1.set_ylabel("")
+        ax_box1.set_xlabel("")
+        ax_box1.spines['right'].set_visible(False)
+        ax_hist1 = fig.add_subplot(gs[:, 2], sharey=ax_box1)
+        ax_hist1.set_title(fName)
+        ax_hist2 = fig.add_subplot(gs[:, 3], sharex=ax_hist1, sharey=ax_box1)
+        ax_hist2.set_title(sName)
+        df_hbond_collec_wt = df_hbond_collec[df_hbond_collec.group == fName]
+        sns.distplot(df_hbond_collec_wt["uniq"], ax=ax_hist1,
+                     vertical=True, kde=False, rug=False,
+                     hist_kws=dict(edgecolor="black"),
+                     color=fcolor)
+        df_hbond_collec_mut = df_hbond_collec[df_hbond_collec.group == sName]
+        ax_hist1.spines['right'].set_visible(False)
+        sns.distplot(df_hbond_collec_mut["uniq"], ax=ax_hist2,
+                     vertical=True, kde=False, rug=False,
+                     hist_kws=dict(edgecolor="black"),
+                     color=scolor)
+        ax_hist1.set_ylabel("")
+        ax_hist2.set_ylabel("")
+        plt.setp(ax_hist1.get_yticklabels(), visible=False)
+        plt.setp(ax_hist2.get_yticklabels(), visible=False)
+        plt.setp(ax_box1.get_yticklabels(), visible=True)
+        ax_box1.tick_params(axis="y", which=u'both', length=0)
+        texts = [fName, sName]
+
+        class HandlerEllipse(HandlerPatch):
+            def create_artists(self, legend, orig_handle,
+                               xdescent, ydescent, width,
+                               height, fontsize, trans):
+                center = 0.5 * width - 0.5 * xdescent, \
+                         0.5 * height - 0.5 * ydescent
+                p = mpatches.Rectangle(xy=center, width=width + xdescent,
+                                       height=height + ydescent,
+                                       linewidth=1, edgecolor='b')
+                self.update_prop(p, orig_handle, legend)
+                p.set_transform(trans)
+                return [p]
+
+        c = [mpatches.Circle(0.5, 0.5, facecolor=colors[i], edgecolor='black',
+                             linewidth=1) for i in range(len(texts))]
+        plt.legend(c, texts, bbox_to_anchor=(1.55, 0.95), loc='center',
+                   handler_map={mpatches.Rectangle: HandlerEllipse()})
+        plt.locator_params(axis="both", integer=True, tight=True)
+        logging.info("Drawing graph for {} bonds...".format(itypes))
+        if os.path.exists(f'{pathy}/{fName}_{sName}_{itypes}_{spec}.png'):
+            plt.savefig(
+                f'{pathy}/{fName}_{sName}_{itypes}_{spec}_{timestamp}.png',
+                bbox_inches='tight', dpi=300)
+            plt.close("all")
+        else:
+            plt.savefig(
+                f'{pathy}/{fName}_{sName}_{itypes}_{spec}.png',
+                bbox_inches='tight', dpi=300)
+            plt.close("all")
+    else:
         logging.info("No {} bonds to draw a graph ...".format(itypes))
-        sys.exit(1)
-
-    pathy = f'{pathx}/graphs'
-
-    os.makedirs(pathy, exist_ok=True)
-
-    colors = [fcolor, scolor]
-    import matplotlib.patches as patches
-    if itypes == "hbonds":
-        itypes = "Hydrogen"
-    else:
-        itypes = itypes.capitalize()
-
-    fig = plt.figure(constrained_layout=True)
-    gs = fig.add_gridspec(4, 4)
-
-    rect = patches.Rectangle((0, 0), 0, 0, linewidth=1,
-                             edgecolor='black', facecolor='none')
-    ax = fig.add_subplot(gs[:, :])
-    ax.add_patch(rect)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_ylabel("Number of " + itypes + " Bonds", size=18)
-    ax.yaxis.set_label_coords(-0.11, 0.5)
-
-    ax_box1 = fig.add_subplot(gs[:, 0:2])
-
-    boxprops = dict(linestyle='-', linewidth=1.5, edgecolor='#7f7f7f')
-    medianprops = {"linestyle": '-', "linewidth": "1.5", "color": "#333333"}
-    capprops = dict(linestyle='-', linewidth=1.5, color='#7f7f7f')
-    whiskerprops = dict(linestyle='-', linewidth=1.5, color='#7f7f7f')
-
-    order = [fName, sName]
-    ax_box1.set_ylim(min(df_hbond_collec["uniq"]) - 1,
-                     max(df_hbond_collec["uniq"]) + 1)
-
-    sns.boxplot(data=df_hbond_collec, x="group", y="uniq",
-                ax=ax_box1, palette=colors, order=order,
-                medianprops=medianprops, boxprops=boxprops,
-                capprops=capprops, whiskerprops=whiskerprops)
-    ax_box1.set_ylabel("")
-    ax_box1.set_xlabel("")
-    ax_box1.spines['right'].set_visible(False)
-    ax_hist1 = fig.add_subplot(gs[:, 2], sharey=ax_box1)
-    ax_hist1.set_title(fName)
-    ax_hist2 = fig.add_subplot(gs[:, 3], sharex=ax_hist1, sharey=ax_box1)
-    ax_hist2.set_title(sName)
-    df_hbond_collec_wt = df_hbond_collec[df_hbond_collec.group == fName]
-    sns.distplot(df_hbond_collec_wt["uniq"], ax=ax_hist1,
-                 vertical=True, kde=False, rug=False,
-                 hist_kws=dict(edgecolor="black"),
-                 color=fcolor)
-    df_hbond_collec_mut = df_hbond_collec[df_hbond_collec.group == sName]
-    ax_hist1.spines['right'].set_visible(False)
-    sns.distplot(df_hbond_collec_mut["uniq"], ax=ax_hist2,
-                 vertical=True, kde=False, rug=False,
-                 hist_kws=dict(edgecolor="black"),
-                 color=scolor)
-    ax_hist1.set_ylabel("")
-    ax_hist2.set_ylabel("")
-    plt.setp(ax_hist1.get_yticklabels(), visible=False)
-    plt.setp(ax_hist2.get_yticklabels(), visible=False)
-    plt.setp(ax_box1.get_yticklabels(), visible=True)
-    ax_box1.tick_params(axis="y", which=u'both', length=0)
-    texts = [fName, sName]
-
-    class HandlerEllipse(HandlerPatch):
-        def create_artists(self, legend, orig_handle,
-                           xdescent, ydescent, width,
-                           height, fontsize, trans):
-            center = 0.5 * width - 0.5 * xdescent, \
-                     0.5 * height - 0.5 * ydescent
-            p = mpatches.Rectangle(xy=center, width=width + xdescent,
-                                   height=height + ydescent,
-                                   linewidth=1, edgecolor='b')
-            self.update_prop(p, orig_handle, legend)
-            p.set_transform(trans)
-            return [p]
-
-    c = [mpatches.Circle(0.5, 0.5, facecolor=colors[i], edgecolor='black',
-                         linewidth=1) for i in range(len(texts))]
-    plt.legend(c, texts, bbox_to_anchor=(1.55, 0.95), loc='center',
-               handler_map={mpatches.Rectangle: HandlerEllipse()})
-    plt.locator_params(axis="both", integer=True, tight=True)
-    logging.info("Drawing graph for {} bonds...".format(itypes))
-    if os.path.exists(f'{pathy}/{fName}_{sName}_{itypes}_{spec}.png'):
-        plt.savefig(
-            f'{pathy}/{fName}_{sName}_{itypes}_{spec}_{timestamp}.png',
-            bbox_inches='tight', dpi=300)
-        plt.close("all")
-    else:
-        plt.savefig(
-            f'{pathy}/{fName}_{sName}_{itypes}_{spec}.png',
-            bbox_inches='tight', dpi=300)
-        plt.close("all")

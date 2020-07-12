@@ -171,7 +171,6 @@ def graph(self):
         print("\nPlease specify either chainIDs or betweenness.")
         sys.exit(1)
     elif self.itypes == "all":
-        print(self.between)
         for itypesx in ["hbonds", "ionic", "hydrophobic", "ring_stacking"]:
             if self.between:
                 print(itypesx)
